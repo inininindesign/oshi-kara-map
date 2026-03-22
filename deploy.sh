@@ -21,7 +21,7 @@ for i in $(seq 1 40); do
   LIVE=$(curl -s "$URL" | grep -o "deploy:[0-9]*" | head -1)
   if [ "$LIVE" = "deploy:$TIMESTAMP" ]; then
     echo "✅ サイトに反映されました！ $URL"
-    osascript -e 'display notification "推しカラ map が更新されました" with title "デプロイ完了 ✅"'
+    afplay /System/Library/Sounds/Glass.aiff
     exit 0
   fi
   echo "  確認中... ($((i*5))秒経過)"
