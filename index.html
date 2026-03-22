@@ -176,7 +176,7 @@
 const SHEET_ID  = '1hLwdo0GoJmoJOBD-8krJd7hsai8mExWDveZgh1vwc3A';
 const GID       = '0';
 const CSV_URL   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}`;
-const CACHE_KEY = 'oshikara_wb_v3';
+const CACHE_KEY = 'oshikara_wb_v4';
 const TTL_MS    = 30 * 60 * 1000;
 
 const YEAR_W  = 100;
@@ -227,7 +227,7 @@ function parseCSV(text){
   return rows;
 }
 
-const ALL_TAGS=['歌える','くるカラ','盛り上げ','大好き','自己満','バラード・感涙','映画/アニメ','センス','ハモり'];
+const ALL_TAGS=['歌える','くるカラ','カラオケ','大好き','自己満','バラード・感涙','映画/アニメ','センス','ハモり'];
 
 function toSongs(rows){
   if(!rows.length) return [];
