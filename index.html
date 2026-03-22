@@ -46,9 +46,10 @@
       padding: 4px 7px; width: 88px; height: 42px;
       box-shadow: 0 1px 5px rgba(0,0,0,0.13);
       cursor: pointer; border-left: 3px solid #ddd;
-      transition: box-shadow 0.15s; overflow: hidden;
+      transition: box-shadow 0.15s, opacity 0.15s; overflow: hidden;
+      opacity: 0.75;
     }
-    .scard:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.22); z-index: 50 !important; }
+    .scard:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.22); z-index: 50 !important; opacity: 1; }
     .scard .ct { font-size: 9px; font-weight: 700; color: #1a1a2e; line-height: 1.35; max-height: 24px; overflow: hidden; }
     .scard .ca { font-size: 8px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
     .scard.vm { border-left-color: #4e9af1; }
@@ -423,14 +424,19 @@ function boot(){
   // カード配置
   const grp={};
   songs.forEach(s=>{const k=`${s.year}_${s.tension}`;(grp[k]=grp[k]||[]).push(s);});
+  const PEEK_H = 15; // タイトル1行分だけ見える高さ
   songs.forEach(s=>{
     const k=`${s.year}_${s.tension}`,g=grp[k],idx=g.indexOf(s);
+    const n=g.length;
     const cx=PAD_L+(s.year-yearMin)*YEAR_W+YEAR_W/2;
     const cy=PAD_T+(MAX_T-s.tension)*LEVEL_H+LEVEL_H/2;
-    const ox=(idx-(g.length-1)/2)*(CARD_W+5);
+    // 縦スタック: スタック全体を cy に中央揃え
+    const totalH=CARD_H+(n-1)*PEEK_H;
+    const cardTop=cy-totalH/2+idx*PEEK_H;
     const el=document.createElement('div');
     el.className='scard'+(s.vocal==='男性'?' vm':s.vocal==='女性'?' vf':s.vocal==='ダブル'?' vd':'');
-    el.style.left=`${cx+ox-CARD_W/2}px`; el.style.top=`${cy-CARD_H/2}px`;
+    el.style.left=`${cx-CARD_W/2}px`; el.style.top=`${cardTop}px`;
+    el.style.zIndex=n-idx; // 先頭カードが一番上
     el.innerHTML=`<div class="ct">${s.title}</div><div class="ca">${s.artist}</div>`;
     el._song=s;
     let md=false;
