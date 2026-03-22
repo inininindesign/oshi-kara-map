@@ -436,7 +436,7 @@ function boot(){
     const el=document.createElement('div');
     el.className='scard'+(s.vocal==='男性'?' vm':s.vocal==='女性'?' vf':s.vocal==='ダブル'?' vd':'');
     el.style.left=`${cx-CARD_W/2}px`; el.style.top=`${cardTop}px`;
-    el.style.zIndex=n-idx; // 先頭カードが一番上
+    el.style.zIndex=idx+1; // 下のカードほど高いz-indexで上に重なり、各タイトルが見える
     el.innerHTML=`<div class="ct">${s.title}</div><div class="ca">${s.artist}</div>`;
     el._song=s;
     let md=false;
