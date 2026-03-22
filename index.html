@@ -175,7 +175,7 @@
 const SHEET_ID  = '1hLwdo0GoJmoJOBD-8krJd7hsai8mExWDveZgh1vwc3A';
 const GID       = '0';
 const CSV_URL   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}`;
-const CACHE_KEY = 'oshikara_wb_v2';
+const CACHE_KEY = 'oshikara_wb_v3';
 const TTL_MS    = 30 * 60 * 1000;
 
 const YEAR_W  = 100;
@@ -226,41 +226,34 @@ function parseCSV(text){
   return rows;
 }
 
-const TAG_DEFS=[
-  {col:5,label:'歌える'},{col:6,label:'くるカラ'},{col:7,label:'盛り上げ'},
-  {col:8,label:'大好き'},{col:9,label:'自己満'},{col:10,label:'バラード・感涙'},
-  {col:11,label:'映画/アニメ'},{col:12,label:'センス'},{col:13,label:'ハモり'},
-];
-const ALL_TAGS=TAG_DEFS.map(t=>t.label);
+const ALL_TAGS=['歌える','くるカラ','盛り上げ','大好き','自己満','バラード・感涙','映画/アニメ','センス','ハモり'];
 
 function toSongs(rows){
   if(!rows.length) return [];
   const hdr=rows[0];
   console.log('ヘッダー全列:', hdr);
 
-  // テンション列を柔軟に検出
-  const tCol=hdr.findIndex(h=>{
-    const v=h.trim().toLowerCase();
-    return v==='テンション'||v==='tension'||v.includes('テンション');
-  });
-  // ボーカル列を柔軟に検出（固定14でなくヘッダーから探す）
-  const vCol=hdr.findIndex(h=>{
-    const v=h.trim().toLowerCase();
-    return v==='ボーカル'||v==='vocal'||v.includes('ボーカル');
-  });
+  // 全列をヘッダー名で動的検出
+  const find=(...names)=>hdr.findIndex(h=>names.includes(h.trim()));
+  const yearCol  =find('発売年');
+  const titleCol =find('曲名');
+  const artistCol=find('歌手名/作品名','アーティスト');
+  const tCol     =find('テンション','tension');
+  const vCol     =find('ボーカル','vocal');
+  const tagCols  =ALL_TAGS.map(label=>({label, col:find(label)})).filter(t=>t.col>=0);
 
-  console.log('テンション列index:', tCol, '/ ボーカル列index:', vCol);
+  console.log('列検出:', {yearCol,titleCol,artistCol,tCol,vCol});
 
   return rows.slice(1).map(r=>{
-    const title=r[3]?.trim()||'', artist=r[4]?.trim()||'';
+    const title =titleCol >=0 ? r[titleCol]?.trim()||''  : '';
+    const artist=artistCol>=0 ? r[artistCol]?.trim()||'' : '';
     if(!title&&!artist) return null;
-    const tension=tCol>=0 ? parseInt(r[tCol])||null : null;
-    const vocal  =vCol>=0 ? r[vCol]?.trim()||''    : r[14]?.trim()||'';
     return {
-      year:   parseInt(r[2])||null,
+      year:    yearCol>=0  ? parseInt(r[yearCol])||null   : null,
       title, artist,
-      tags:   TAG_DEFS.filter(t=>r[t.col]?.trim()).map(t=>t.label),
-      vocal, tension,
+      tags:    tagCols.filter(t=>r[t.col]?.trim()).map(t=>t.label),
+      vocal:   vCol>=0     ? r[vCol]?.trim()||''          : '',
+      tension: tCol>=0     ? parseInt(r[tCol])||null      : null,
     };
   }).filter(Boolean);
 }
