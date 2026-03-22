@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>推しカラ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Helvetica Neue', Arial, sans-serif; }
+
+    /* ─── Toolbar ─── */
+    #toolbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 50px;
+      background: rgba(26,26,46,0.97); backdrop-filter: blur(8px);
+      display: flex; align-items: center; padding: 0 16px; gap: 10px;
+      z-index: 200; border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    #toolbar h1 { font-size: 1.1rem; color: white; letter-spacing: 0.05em; }
+    .tb-sep { width: 1px; height: 24px; background: rgba(255,255,255,0.15); flex-shrink: 0; }
+    .tb-spacer { flex: 1; }
+    .tb-btn {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+      color: white; padding: 5px 12px; border-radius: 6px; cursor: pointer;
+      font-size: 0.82rem; transition: background 0.15s; white-space: nowrap;
+    }
+    .tb-btn:hover { background: rgba(255,255,255,0.2); }
+    .tb-btn.active { background: #e94560; border-color: #e94560; }
+
+    #statusBadge {
+      font-size: 0.75rem; padding: 3px 10px; border-radius: 20px;
+      background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7);
+      border: 1px solid rgba(255,255,255,0.2);
+      display: flex; align-items: center; gap: 5px;
+    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink:0; }
+    .dot.spin { background: none; border: 2px solid currentColor; border-top-color: transparent; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Whiteboard ─── */
+    #board-wrap {
+      position: fixed; top: 50px; left: 0; right: 0; bottom: 0;
+      overflow: hidden; background: #fafaf8; cursor: grab; user-select: none;
+    }
+    #board-wrap.grabbing { cursor: grabbing; }
+    #board { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+
+    /* ─── Song cards ─── */
+    .scard {
+      position: absolute; background: white; border-radius: 5px;
+      padding: 4px 7px; width: 88px; height: 42px;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.13);
+      cursor: pointer; border-left: 3px solid #ddd;
+      transition: box-shadow 0.15s; overflow: hidden;
+    }
+    .scard:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.22); z-index: 50 !important; }
+    .scard .ct { font-size: 9px; font-weight: 700; color: #1a1a2e; line-height: 1.35; max-height: 24px; overflow: hidden; }
+    .scard .ca { font-size: 8px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+    .scard.vm { border-left-color: #4e9af1; }
+    .scard.vf { border-left-color: #f16fa0; }
+    .scard.vd { border-left-color: #a78bfa; }
+    .scard.hidden { display: none; }
+
+    /* ─── Detail panel ─── */
+    #detail {
+      position: fixed; right: 16px; top: 66px; width: 260px;
+      background: white; border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.16);
+      padding: 18px; z-index: 300; display: none;
+    }
+    #detail-close { position: absolute; top: 10px; right: 12px; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #bbb; }
+    #detail h3 { font-size: 1rem; color: #1a1a2e; margin-bottom: 3px; line-height: 1.3; padding-right: 20px; }
+    #detail .d-artist { font-size: 0.85rem; color: #777; margin-bottom: 12px; }
+    .d-row { display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 5px; }
+    .d-label { color: #bbb; }
+    .d-val { color: #333; font-weight: 600; }
+    .d-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+    .d-tag { padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; background: #f0f0f0; color: #666; }
+
+    /* ─── Filter panel ─── */
+    #filter-panel {
+      position: fixed; left: 16px; top: 66px; width: 216px;
+      background: white; border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.16);
+      padding: 14px; z-index: 300; display: none;
+    }
+    .fp-label { font-size: 0.72rem; font-weight: 700; color: #bbb; text-transform: uppercase; letter-spacing: 0.05em; margin: 10px 0 5px; }
+    .fp-label:first-child { margin-top: 0; }
+    #filter-panel input, #filter-panel select {
+      width: 100%; border: 2px solid #e8e8e8; border-radius: 6px; padding: 6px 8px;
+      font-size: 0.85rem; outline: none;
+    }
+    #filter-panel input:focus, #filter-panel select:focus { border-color: #0f3460; }
+    .fp-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+    .fp-tag {
+      padding: 3px 9px; border: 1.5px solid #e8e8e8; border-radius: 14px;
+      font-size: 0.74rem; cursor: pointer; background: white; transition: all 0.15s;
+    }
+    .fp-tag.active { background: #e94560; color: white; border-color: #e94560; }
+    .fp-count { font-size: 0.8rem; color: #bbb; text-align: center; margin-top: 10px; }
+    .fp-reset { width: 100%; margin-top: 8px; padding: 7px; background: #f5f5f5; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+    .fp-reset:hover { background: #eee; }
+
+    /* ─── Overlay ─── */
+    #overlay {
+      position: fixed; inset: 50px 0 0 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 400; background: #fafaf8;
+    }
+    .spinner { width: 40px; height: 40px; border: 4px solid #ddd; border-top-color: #0f3460; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 16px; }
+    #overlay p { color: #888; font-size: 0.95rem; }
+    .err-box { background: white; border-radius: 12px; padding: 24px; max-width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); color: #b91c1c; }
+    .err-box strong { display: block; margin-bottom: 10px; }
+    .err-box ol { margin-left: 18px; line-height: 2.2; font-size: 0.88rem; color: #444; }
+
+    /* ─── Legend ─── */
+    #legend {
+      position: fixed; bottom: 16px; right: 16px;
+      background: rgba(255,255,255,0.92); border-radius: 8px;
+      padding: 8px 12px; font-size: 0.75rem; color: #888;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: flex; gap: 10px; align-items: center;
+    }
+    .lg { display: flex; align-items: center; gap: 4px; }
+    .lg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <h1>🎵 推しカラ</h1>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="filterBtn" onclick="toggleFilter()">🔍 絞り込み</button>
+  <button class="tb-btn" onclick="fitView()">全体表示</button>
+  <button class="tb-btn" onclick="doZoomBtn(1.25)">＋</button>
+  <button class="tb-btn" onclick="doZoomBtn(0.8)">－</button>
+  <button class="tb-btn" onclick="loadData(true)" title="強制更新">↻</button>
+  <div class="tb-spacer"></div>
+  <div id="statusBadge"><span class="dot spin" id="sDot"></span><span id="sTxt">読み込み中...</span></div>
+</div>
+
+<div id="board-wrap"><div id="board"></div></div>
+
+<div id="overlay">
+  <div class="spinner"></div>
+  <p>スプレッドシートからデータを読み込み中...</p>
+</div>
+
+<div id="detail">
+  <button id="detail-close" onclick="closeDetail()">×</button>
+  <h3 id="d-title"></h3>
+  <div class="d-artist" id="d-artist"></div>
+  <div class="d-row"><span class="d-label">発売年</span><span class="d-val" id="d-year"></span></div>
+  <div class="d-row"><span class="d-label">テンション</span><span class="d-val" id="d-tens"></span></div>
+  <div class="d-row"><span class="d-label">ボーカル</span><span class="d-val" id="d-vocal"></span></div>
+  <div class="d-tags" id="d-tags"></div>
+</div>
+
+<div id="filter-panel">
+  <div class="fp-label">曲名 / アーティスト</div>
+  <input type="text" id="fp-search" placeholder="キーワード...">
+  <div class="fp-label">アーティスト</div>
+  <select id="fp-artist"><option value="">すべて</option></select>
+  <div class="fp-label">ボーカル</div>
+  <select id="fp-vocal">
+    <option value="">すべて</option>
+    <option value="男性">男性</option>
+    <option value="女性">女性</option>
+    <option value="ダブル">ダブル</option>
+  </select>
+  <div class="fp-label">タグ</div>
+  <div class="fp-tags" id="fp-tags"></div>
+  <button class="fp-reset" onclick="resetFilters()">リセット</button>
+  <div class="fp-count" id="fp-count"></div>
+</div>
+
+<div id="legend">
+  <div class="lg"><div class="lg-dot" style="background:#4e9af1"></div>男性</div>
+  <div class="lg"><div class="lg-dot" style="background:#f16fa0"></div>女性</div>
+  <div class="lg"><div class="lg-dot" style="background:#a78bfa"></div>ダブル</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// 設定
+// ═══════════════════════════════════════════
+const SHEET_ID  = '1hLwdo0GoJmoJOBD-8krJd7hsai8mExWDveZgh1vwc3A';
+const GID       = '0';
+const CSV_URL   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}`;
+const CACHE_KEY = 'oshikara_wb_v1';
+const TTL_MS    = 30 * 60 * 1000;
+
+// ═══════════════════════════════════════════
+// レイアウト
+// ═══════════════════════════════════════════
+const YEAR_W  = 100;
+const LEVEL_H = 80;
+const PAD_L   = 55;
+const PAD_T   = 20;
+const PAD_B   = 45;
+const PAD_R   = 40;
+const CARD_W  = 88;
+const CARD_H  = 42;
+const MAX_T   = 10;
+const MIN_T   = 1;
+
+// ═══════════════════════════════════════════
+// ユーティリティ
+// ═══════════════════════════════════════════
+function hashStr(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h,33) ^ s.charCodeAt(i);
+  return (h>>>0).toString(36);
+}
+function timeAgo(ts) {
+  const s = Math.floor((Date.now()-ts)/1000);
+  if (s<60) return s+'秒前';
+  if (s<3600) return Math.floor(s/60)+'分前';
+  return Math.floor(s/3600)+'時間前';
+}
+function clamp(v,a,b) { return Math.max(a,Math.min(b,v)); }
+function setStatus(color, text, spin=false) {
+  document.getElementById('sTxt').textContent = text;
+  document.getElementById('sDot').className = 'dot' + (spin?' spin':'');
+  document.getElementById('statusBadge').style.color = color;
+}
+
+// ═══════════════════════════════════════════
+// キャッシュ
+// ═══════════════════════════════════════════
+function getCache()    { try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch { return null; } }
+function putCache(obj) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(obj)); } catch {} }
+
+// ═══════════════════════════════════════════
+// CSV パーサー
+// ═══════════════════════════════════════════
+function parseCSV(text) {
+  const rows = [];
+  let row=[], field='', inQ=false;
+  for (let i=0; i<text.length; i++) {
+    const c=text[i], n=text[i+1];
+    if (inQ) {
+      if (c==='"'&&n==='"'){field+='"';i++;}
+      else if(c==='"') inQ=false;
+      else field+=c;
+    } else {
+      if(c==='"') inQ=true;
+      else if(c===','){row.push(field);field='';}
+      else if(c==='\n'||(c==='\r'&&n==='\n')){
+        row.push(field);field='';
+        if(row.some(x=>x.trim())) rows.push(row);
+        row=[];if(c==='\r')i++;
+      } else field+=c;
+    }
+  }
+  if(row.length){row.push(field);if(row.some(x=>x.trim())) rows.push(row);}
+  return rows;
+}
+
+const TAG_DEFS = [
+  {col:5,label:'歌える'},{col:6,label:'くるカラ'},{col:7,label:'盛り上げ'},
+  {col:8,label:'大好き'},{col:9,label:'自己満'},{col:10,label:'バラード・感涙'},
+  {col:11,label:'映画/アニメ'},{col:12,label:'センス'},{col:13,label:'ハモり'},
+];
+const ALL_TAGS = TAG_DEFS.map(t=>t.label);
+
+function toSongs(rows) {
+  if (!rows.length) return [];
+  const hdr = rows[0];
+  const tCol = hdr.findIndex(h => h.trim()==='テンション');
+  return rows.slice(1).map(r => {
+    const title=r[3]?.trim()||'', artist=r[4]?.trim()||'';
+    if (!title&&!artist) return null;
+    return {
+      year:    parseInt(r[2])||null,
+      title, artist,
+      tags:    TAG_DEFS.filter(t=>r[t.col]?.trim()).map(t=>t.label),
+      vocal:   r[14]?.trim()||'',
+      tension: tCol>=0 ? parseInt(r[tCol])||null : null,
+    };
+  }).filter(Boolean);
+}
+
+// ═══════════════════════════════════════════
+// データ取得
+// ═══════════════════════════════════════════
+let SONGS=[], fetching=false;
+
+async function loadData(force=false) {
+  if (fetching) return;
+  const cache = getCache();
+
+  // TTL内はキャッシュのみ
+  if (cache && !force && Date.now()-cache.fetchedAt < TTL_MS) {
+    SONGS=cache.songs;
+    setStatus('#6ee7b7',`キャッシュ (${timeAgo(cache.fetchedAt)})`);
+    boot(); return;
+  }
+  // キャッシュあれば先に表示
+  if (cache && !force) {
+    SONGS=cache.songs; boot();
+    setStatus('rgba(255,255,255,0.7)','確認中...',true);
+  }
+
+  fetching=true;
+  try {
+    const res = await fetch(CSV_URL);
+    if (!res.ok) throw new Error(res.status);
+    const text = await res.text();
+    const h = hashStr(text);
+    if (cache && cache.hash===h) {
+      putCache({...cache, fetchedAt:Date.now()});
+      setStatus('#6ee7b7','変更なし');
+    } else {
+      SONGS = toSongs(parseCSV(text));
+      putCache({songs:SONGS, hash:h, fetchedAt:Date.now()});
+      setStatus('#6ee7b7','更新済み');
+      boot();
+    }
+  } catch(e) {
+    if (!cache) {
+      document.getElementById('overlay').innerHTML =
+        `<div class="err-box"><strong>⚠️ 読み込み失敗</strong>スプレッドシートを「リンクを知っている全員が閲覧可」に設定してください。<ol><li>スプレッドシートを開く</li><li>「共有」→「リンクを知っている全員」→「閲覧者」</li><li>ページを再読み込み</li></ol></div>`;
+      setStatus('#fca5a5','読み込み失敗');
+    } else {
+      setStatus('#fca5a5',`オフライン(${timeAgo(cache.fetchedAt)})`);
+    }
+  } finally { fetching=false; }
+}
+
+// ═══════════════════════════════════════════
+// ズーム / パン
+// ═══════════════════════════════════════════
+let sc=1, tx=0, ty=0;
+const wrap  = document.getElementById('board-wrap');
+const board = document.getElementById('board');
+
+function applyT() { board.style.transform=`translate(${tx}px,${ty}px) scale(${sc})`; }
+
+function zoom(f, cx, cy) {
+  const ns=clamp(sc*f,0.04,8);
+  tx=cx-(cx-tx)*ns/sc; ty=cy-(cy-ty)*ns/sc; sc=ns; applyT();
+}
+function doZoomBtn(f) { const r=wrap.getBoundingClientRect(); zoom(f,r.width/2,r.height/2); }
+
+// Wheel
+wrap.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const r=wrap.getBoundingClientRect();
+  zoom(e.deltaY<0?1.12:1/1.12, e.clientX-r.left, e.clientY-r.top);
+},{passive:false});
+
+// Mouse drag
+let drag=false, mx0,my0,tx0,ty0;
+wrap.addEventListener('mousedown', e=>{
+  if (e.target.closest('.scard')) return;
+  drag=true; mx0=e.clientX; my0=e.clientY; tx0=tx; ty0=ty;
+  wrap.classList.add('grabbing');
+});
+window.addEventListener('mousemove', e=>{ if(!drag)return; tx=tx0+(e.clientX-mx0); ty=ty0+(e.clientY-my0); applyT(); });
+window.addEventListener('mouseup', ()=>{ drag=false; wrap.classList.remove('grabbing'); });
+
+// Touch
+let tpts={}, pinch0=null, ppan=null;
+wrap.addEventListener('touchstart', e=>{
+  e.preventDefault();
+  for(const t of e.changedTouches) tpts[t.identifier]=[t.clientX,t.clientY];
+  const ids=Object.keys(tpts);
+  if(ids.length===1){ const [cx,cy]=tpts[ids[0]]; ppan={cx,cy,tx0:tx,ty0:ty}; }
+  else if(ids.length>=2){
+    const [a,b]=ids.slice(0,2).map(id=>tpts[id]);
+    const r=wrap.getBoundingClientRect();
+    pinch0={d:Math.hypot(b[0]-a[0],b[1]-a[1]),sc0:sc,tx0:tx,ty0:ty,
+      mx:(a[0]+b[0])/2-r.left, my:(a[1]+b[1])/2-r.top};
+    ppan=null;
+  }
+},{passive:false});
+wrap.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  for(const t of e.changedTouches) tpts[t.identifier]=[t.clientX,t.clientY];
+  const ids=Object.keys(tpts);
+  if(ids.length===1&&ppan){
+    const [cx,cy]=tpts[ids[0]]; tx=ppan.tx0+cx-ppan.cx; ty=ppan.ty0+cy-ppan.cy; applyT();
+  } else if(ids.length>=2&&pinch0){
+    const [a,b]=ids.slice(0,2).map(id=>tpts[id]);
+    const d=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    const ns=clamp(pinch0.sc0*d/pinch0.d,0.04,8);
+    tx=pinch0.mx-(pinch0.mx-pinch0.tx0)*ns/pinch0.sc0;
+    ty=pinch0.my-(pinch0.my-pinch0.ty0)*ns/pinch0.sc0;
+    sc=ns; applyT();
+  }
+},{passive:false});
+wrap.addEventListener('touchend', e=>{
+  for(const t of e.changedTouches) delete tpts[t.identifier];
+  pinch0=null;
+  const ids=Object.keys(tpts);
+  if(ids.length===1) ppan={cx:tpts[ids[0]][0],cy:tpts[ids[0]][1],tx0:tx,ty0:ty};
+},{passive:false});
+
+// ═══════════════════════════════════════════
+// フィルター
+// ═══════════════════════════════════════════
+let fS='', fA='', fV='', fT=new Set();
+
+function applyFilter() {
+  let n=0;
+  document.querySelectorAll('.scard').forEach(el=>{
+    const s=el._song;
+    let ok=true;
+    if(fS){ const q=fS.toLowerCase(); if(!s.title.toLowerCase().includes(q)&&!s.artist.toLowerCase().includes(q)) ok=false; }
+    if(ok&&fA&&s.artist!==fA) ok=false;
+    if(ok&&fV&&s.vocal!==fV) ok=false;
+    for(const t of fT) if(!s.tags.includes(t)){ ok=false; break; }
+    el.classList.toggle('hidden',!ok);
+    if(ok) n++;
+  });
+  document.getElementById('fp-count').textContent=`${n}曲表示中`;
+}
+
+function resetFilters() {
+  fS='';fA='';fV='';fT.clear();
+  document.getElementById('fp-search').value='';
+  document.getElementById('fp-artist').value='';
+  document.getElementById('fp-vocal').value='';
+  document.querySelectorAll('.fp-tag').forEach(b=>b.classList.remove('active'));
+  applyFilter();
+}
+
+function toggleFilter() {
+  const p=document.getElementById('filter-panel');
+  const show=p.style.display!=='block';
+  p.style.display=show?'block':'none';
+  document.getElementById('filterBtn').classList.toggle('active',show);
+}
+
+// ═══════════════════════════════════════════
+// ディテール
+// ═══════════════════════════════════════════
+function showDetail(s) {
+  document.getElementById('d-title').textContent  = s.title;
+  document.getElementById('d-artist').textContent = s.artist;
+  document.getElementById('d-year').textContent   = s.year?s.year+'年':'不明';
+  document.getElementById('d-tens').textContent   = s.tension?`${s.tension} / 10`:'不明';
+  document.getElementById('d-vocal').textContent  = s.vocal||'—';
+  document.getElementById('d-tags').innerHTML     = s.tags.map(t=>`<span class="d-tag">${t}</span>`).join('');
+  document.getElementById('detail').style.display='block';
+}
+function closeDetail() { document.getElementById('detail').style.display='none'; }
+
+// ═══════════════════════════════════════════
+// ボード構築
+// ═══════════════════════════════════════════
+let yearMin, yearMax;
+
+function fitView() {
+  const vw=wrap.clientWidth, vh=wrap.clientHeight;
+  const bw=PAD_L+(yearMax-yearMin+2)*YEAR_W+PAD_R;
+  const bh=PAD_T+(MAX_T-MIN_T+1)*LEVEL_H+PAD_B;
+  sc=Math.min(vw/bw,vh/bh)*0.93;
+  tx=(vw-bw*sc)/2; ty=(vh-bh*sc)/2; applyT();
+}
+
+function boot() {
+  document.getElementById('overlay').style.display='none';
+
+  const songs=SONGS.filter(s=>s.year&&s.tension>=1&&s.tension<=10);
+  if(!songs.length) return;
+
+  yearMin=Math.min(...songs.map(s=>s.year));
+  yearMax=Math.max(...songs.map(s=>s.year));
+
+  const bw=PAD_L+(yearMax-yearMin+2)*YEAR_W+PAD_R;
+  const bh=PAD_T+(MAX_T-MIN_T+1)*LEVEL_H+PAD_B;
+  board.style.width=bw+'px'; board.style.height=bh+'px';
+
+  // ─── SVGグリッド ───
+  const svg=[`<svg width="${bw}" height="${bh}" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;pointer-events:none">`];
+  svg.push(`<rect width="${bw}" height="${bh}" fill="#fafaf8"/>`);
+
+  const btm=PAD_T+(MAX_T-MIN_T+1)*LEVEL_H;
+
+  // 横線（テンション）
+  for(let t=MIN_T;t<=MAX_T;t++){
+    const y=PAD_T+(MAX_T-t)*LEVEL_H;
+    const col=t%5===0?'#d8d8d0':'#ececE8';
+    const sw=t%5===0?1.5:1;
+    svg.push(`<line x1="${PAD_L}" y1="${y}" x2="${bw-PAD_R}" y2="${y}" stroke="${col}" stroke-width="${sw}"/>`);
+    svg.push(`<text x="${PAD_L-8}" y="${y+LEVEL_H/2}" text-anchor="end" dominant-baseline="middle" font-size="12" fill="#ccc" font-weight="700" font-family="sans-serif">${t}</text>`);
+  }
+  svg.push(`<line x1="${PAD_L}" y1="${btm}" x2="${bw-PAD_R}" y2="${btm}" stroke="#d8d8d0" stroke-width="1.5"/>`);
+
+  // 縦線（年）
+  for(let y=yearMin;y<=yearMax+1;y++){
+    const x=PAD_L+(y-yearMin)*YEAR_W;
+    const is10=y%10===0, is5=y%5===0;
+    svg.push(`<line x1="${x}" y1="${PAD_T}" x2="${x}" y2="${btm}" stroke="${is10?'#d0d0c8':is5?'#e4e4de':'#f0f0ec'}" stroke-width="${is10?1.5:1}"/>`);
+    if(is5) svg.push(`<text x="${x}" y="${btm+22}" text-anchor="middle" font-size="11" fill="#ccc" font-weight="700" font-family="sans-serif">${y}</text>`);
+  }
+
+  // テンション軸ラベル
+  const midY=PAD_T+(MAX_T-MIN_T+1)*LEVEL_H/2;
+  svg.push(`<text transform="rotate(-90,16,${midY})" x="16" y="${midY}" text-anchor="middle" dominant-baseline="middle" font-size="11" fill="#ccc" font-weight="700" font-family="sans-serif">テンション</text>`);
+  svg.push('</svg>');
+  board.innerHTML=svg.join('');
+
+  // ─── カードグループ（同year+tension） ───
+  const grp={};
+  songs.forEach(s=>{ const k=`${s.year}_${s.tension}`; (grp[k]=grp[k]||[]).push(s); });
+
+  songs.forEach(s=>{
+    const k=`${s.year}_${s.tension}`, g=grp[k], idx=g.indexOf(s);
+    const cx=PAD_L+(s.year-yearMin)*YEAR_W+YEAR_W/2;
+    const cy=PAD_T+(MAX_T-s.tension)*LEVEL_H+LEVEL_H/2;
+    const ox=(idx-(g.length-1)/2)*(CARD_W+5);
+
+    const el=document.createElement('div');
+    el.className='scard'+(s.vocal==='男性'?' vm':s.vocal==='女性'?' vf':s.vocal==='ダブル'?' vd':'');
+    el.style.left=`${cx+ox-CARD_W/2}px`;
+    el.style.top= `${cy-CARD_H/2}px`;
+    el.innerHTML=`<div class="ct">${s.title}</div><div class="ca">${s.artist}</div>`;
+    el._song=s;
+
+    // クリック（ドラッグと区別）
+    let md=false;
+    el.addEventListener('mousedown',e=>{e.stopPropagation();md=true;});
+    el.addEventListener('mousemove',()=>md=false);
+    el.addEventListener('mouseup',e=>{e.stopPropagation();if(md) showDetail(s);md=false;});
+    el.addEventListener('touchend',e=>{e.stopPropagation();e.preventDefault();showDetail(s);},{passive:false});
+
+    board.appendChild(el);
+  });
+
+  // ─── フィルターUI初期化 ───
+  const sel=document.getElementById('fp-artist');
+  sel.innerHTML='<option value="">すべて</option>';
+  [...new Set(SONGS.map(s=>s.artist))].sort((a,b)=>a.localeCompare(b,'ja')).forEach(a=>{
+    const o=document.createElement('option');o.value=a;o.textContent=a;sel.appendChild(o);
+  });
+  const fpTags=document.getElementById('fp-tags');
+  fpTags.innerHTML='';
+  ALL_TAGS.forEach(tag=>{
+    const b=document.createElement('button');
+    b.className='fp-tag';b.textContent=tag;
+    b.onclick=()=>{ fT.has(tag)?fT.delete(tag):fT.add(tag); b.classList.toggle('active',fT.has(tag)); applyFilter(); };
+    fpTags.appendChild(b);
+  });
+
+  document.getElementById('fp-search').oninput=e=>{fS=e.target.value;applyFilter();};
+  document.getElementById('fp-artist').onchange=e=>{fA=e.target.value;applyFilter();};
+  document.getElementById('fp-vocal').onchange=e=>{fV=e.target.value;applyFilter();};
+
+  document.getElementById('fp-count').textContent=`${songs.length}曲表示中`;
+  fitView();
+}
+
+// ─── 起動 ───
+loadData();
+</script>
+</body>
+</html>
