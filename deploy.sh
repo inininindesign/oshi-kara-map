@@ -21,7 +21,6 @@ for i in $(seq 1 40); do
   LIVE=$(curl -s "$URL" | grep -o "deploy:[0-9]*" | head -1)
   if [ "$LIVE" = "deploy:$TIMESTAMP" ]; then
     echo "✅ サイトに反映されました！ $URL"
-    afplay /System/Library/Sounds/Glass.aiff
     exit 0
   fi
   echo "  確認中... ($((i*5))秒経過)"
