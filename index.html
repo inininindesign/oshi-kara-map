@@ -115,7 +115,7 @@
     .lg { display: flex; align-items: center; gap: 4px; }
     .lg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
   </style>
-<!-- deploy:1774188139 --></head>
+<!-- deploy:1774921028 --></head>
 <body>
 
 <div id="toolbar">
@@ -175,7 +175,7 @@
 const SHEET_ID  = '1hLwdo0GoJmoJOBD-8krJd7hsai8mExWDveZgh1vwc3A';
 const GID       = '0';
 const CSV_URL   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}`;
-const CACHE_KEY = 'oshikara_wb_v4';
+const CACHE_KEY = 'oshikara_wb_v5';
 const TTL_MS    = 30 * 60 * 1000;
 
 const YEAR_W  = 100;
@@ -226,7 +226,7 @@ function parseCSV(text){
   return rows;
 }
 
-const ALL_TAGS=['歌える','くるカラ','カラオケ','バラード・感涙','アニメ・映画','ハモり'];
+const ALL_TAGS=['歌える','くるカラ','カラオケ','バラード・感涙','アニメ・映画','ハモり','オーケストラ'];
 
 function toSongs(rows){
   if(!rows.length) return [];
