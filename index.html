@@ -115,7 +115,7 @@
     .lg { display: flex; align-items: center; gap: 4px; }
     .lg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
   </style>
-<!-- deploy:1774921028 --></head>
+<!-- deploy:1775128769 --></head>
 <body>
 
 <div id="toolbar">
@@ -126,6 +126,7 @@
   <button class="tb-btn" onclick="doZoomBtn(1.25)">＋</button>
   <button class="tb-btn" onclick="doZoomBtn(0.8)">－</button>
   <button class="tb-btn" onclick="loadData(true)" title="強制更新">↻</button>
+  <button class="tb-btn" onclick="resetPositions()" title="カード位置をリセット">位置リセット</button>
   <div class="tb-spacer"></div>
   <div id="statusBadge"><span class="dot spin" id="sDot"></span><span id="sTxt">読み込み中...</span></div>
 </div>
@@ -207,6 +208,13 @@ function setStatus(color,text,spin=false){
 // ── キャッシュ ──
 function getCache(){try{return JSON.parse(localStorage.getItem(CACHE_KEY));}catch{return null;}}
 function putCache(obj){try{localStorage.setItem(CACHE_KEY,JSON.stringify(obj));}catch{}}
+
+// ── カード位置保存 ──
+const POS_KEY='oshikara_positions_v1';
+function loadPositions(){try{return JSON.parse(localStorage.getItem(POS_KEY))||{};}catch{return {};}}
+function savePositions(pos){try{localStorage.setItem(POS_KEY,JSON.stringify(pos));}catch{}}
+function songKey(s){return `${s.title}__${s.artist}`;}
+function resetPositions(){localStorage.removeItem(POS_KEY);boot();}
 
 // ── CSV パーサー ──
 function parseCSV(text){
@@ -305,9 +313,36 @@ function doZoomBtn(f){const r=wrap.getBoundingClientRect();zoom(f,r.width/2,r.he
 wrap.addEventListener('wheel',e=>{e.preventDefault();const r=wrap.getBoundingClientRect();zoom(e.deltaY<0?1.12:1/1.12,e.clientX-r.left,e.clientY-r.top);},{passive:false});
 
 let drag=false,mx0,my0,tx0,ty0;
+let cardDrag=null;
 wrap.addEventListener('mousedown',e=>{if(e.target.closest('.scard'))return;drag=true;mx0=e.clientX;my0=e.clientY;tx0=tx;ty0=ty;wrap.classList.add('grabbing');});
-window.addEventListener('mousemove',e=>{if(!drag)return;tx=tx0+(e.clientX-mx0);ty=ty0+(e.clientY-my0);applyT();});
-window.addEventListener('mouseup',()=>{drag=false;wrap.classList.remove('grabbing');});
+window.addEventListener('mousemove',e=>{
+  if(drag){tx=tx0+(e.clientX-mx0);ty=ty0+(e.clientY-my0);applyT();}
+  if(cardDrag){
+    const dx=(e.clientX-cardDrag.sx)/sc, dy=(e.clientY-cardDrag.sy)/sc;
+    if(Math.abs(dx)>3||Math.abs(dy)>3) cardDrag.moved=true;
+    if(cardDrag.moved){
+      cardDrag.el.style.left=(cardDrag.ox+dx)+'px';
+      cardDrag.el.style.top=(cardDrag.oy+dy)+'px';
+      cardDrag.el.style.zIndex=1000;
+      cardDrag.el.style.boxShadow='0 8px 24px rgba(0,0,0,0.3)';
+    }
+  }
+});
+window.addEventListener('mouseup',()=>{
+  drag=false; wrap.classList.remove('grabbing');
+  if(cardDrag){
+    if(cardDrag.moved){
+      const pos=loadPositions();
+      pos[songKey(cardDrag.song)]={left:parseFloat(cardDrag.el.style.left),top:parseFloat(cardDrag.el.style.top)};
+      savePositions(pos);
+      cardDrag.el.style.boxShadow='';
+      setStatus('#6ee7b7','位置を保存しました');
+    } else {
+      showDetail(cardDrag.song);
+    }
+    cardDrag=null;
+  }
+});
 
 let tpts={},pinch0=null,ppan=null;
 wrap.addEventListener('touchstart',e=>{
@@ -424,6 +459,7 @@ function boot(){
   const grp={};
   songs.forEach(s=>{const k=`${s.year}_${s.tension}`;(grp[k]=grp[k]||[]).push(s);});
   const PEEK_H = 15; // タイトル1行分だけ見える高さ
+  const savedPos=loadPositions();
   songs.forEach(s=>{
     const k=`${s.year}_${s.tension}`,g=grp[k],idx=g.indexOf(s);
     const n=g.length;
@@ -434,14 +470,16 @@ function boot(){
     const cardTop=cy-totalH/2+idx*PEEK_H;
     const el=document.createElement('div');
     el.className='scard'+(s.vocal==='男性'?' vm':s.vocal==='女性'?' vf':s.vocal==='ダブル'?' vd':'');
-    el.style.left=`${cx-CARD_W/2+idx*6}px`; el.style.top=`${cardTop}px`;
-    el.style.zIndex=idx+1; // 下のカードほど高いz-indexで上に重なり、各タイトルが見える
+    const saved=savedPos[songKey(s)];
+    el.style.left=`${saved?saved.left:cx-CARD_W/2+idx*6}px`;
+    el.style.top=`${saved?saved.top:cardTop}px`;
+    el.style.zIndex=idx+1;
     el.innerHTML=`<div class="ct">${s.title}</div><div class="ca">${s.artist}</div>`;
     el._song=s;
-    let md=false;
-    el.addEventListener('mousedown',e=>{e.stopPropagation();md=true;});
-    el.addEventListener('mousemove',()=>md=false);
-    el.addEventListener('mouseup',e=>{e.stopPropagation();if(md)showDetail(s);md=false;});
+    el.addEventListener('mousedown',e=>{
+      e.stopPropagation();
+      cardDrag={el,song:s,sx:e.clientX,sy:e.clientY,ox:parseFloat(el.style.left),oy:parseFloat(el.style.top),moved:false};
+    });
     el.addEventListener('touchend',e=>{e.stopPropagation();e.preventDefault();showDetail(s);},{passive:false});
     board.appendChild(el);
   });
