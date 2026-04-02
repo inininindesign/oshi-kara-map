@@ -115,7 +115,7 @@
     .lg { display: flex; align-items: center; gap: 4px; }
     .lg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
   </style>
-<!-- deploy:1775128769 --></head>
+<!-- deploy:1775129000 --></head>
 <body>
 
 <div id="toolbar">
@@ -209,12 +209,19 @@ function setStatus(color,text,spin=false){
 function getCache(){try{return JSON.parse(localStorage.getItem(CACHE_KEY));}catch{return null;}}
 function putCache(obj){try{localStorage.setItem(CACHE_KEY,JSON.stringify(obj));}catch{}}
 
-// ── カード位置保存 ──
+// ── カード位置・テンション保存 ──
 const POS_KEY='oshikara_positions_v1';
+const TENSION_KEY='oshikara_tensions_v1';
 function loadPositions(){try{return JSON.parse(localStorage.getItem(POS_KEY))||{};}catch{return {};}}
 function savePositions(pos){try{localStorage.setItem(POS_KEY,JSON.stringify(pos));}catch{}}
+function loadTensionOverrides(){try{return JSON.parse(localStorage.getItem(TENSION_KEY))||{};}catch{return {};}}
+function saveTensionOverrides(obj){try{localStorage.setItem(TENSION_KEY,JSON.stringify(obj));}catch{}}
 function songKey(s){return `${s.title}__${s.artist}`;}
-function resetPositions(){localStorage.removeItem(POS_KEY);boot();}
+function tensionFromY(cardTop){
+  const centerY=cardTop+CARD_H/2;
+  return clamp(Math.round(MAX_T-(centerY-PAD_T-LEVEL_H/2)/LEVEL_H),MIN_T,MAX_T);
+}
+function resetPositions(){localStorage.removeItem(POS_KEY);localStorage.removeItem(TENSION_KEY);location.reload();}
 
 // ── CSV パーサー ──
 function parseCSV(text){
@@ -332,11 +339,18 @@ window.addEventListener('mouseup',()=>{
   drag=false; wrap.classList.remove('grabbing');
   if(cardDrag){
     if(cardDrag.moved){
+      const left=parseFloat(cardDrag.el.style.left), top=parseFloat(cardDrag.el.style.top);
       const pos=loadPositions();
-      pos[songKey(cardDrag.song)]={left:parseFloat(cardDrag.el.style.left),top:parseFloat(cardDrag.el.style.top)};
+      pos[songKey(cardDrag.song)]={left,top};
       savePositions(pos);
+      // テンション更新
+      const newT=tensionFromY(top);
+      cardDrag.song.tension=newT;
+      const tov=loadTensionOverrides();
+      tov[songKey(cardDrag.song)]=newT;
+      saveTensionOverrides(tov);
       cardDrag.el.style.boxShadow='';
-      setStatus('#6ee7b7','位置を保存しました');
+      setStatus('#6ee7b7',`保存 (テンション → ${newT})`);
     } else {
       showDetail(cardDrag.song);
     }
@@ -413,6 +427,9 @@ function fitView(){
 
 function boot(){
   document.getElementById('overlay').style.display='none';
+  // テンション上書き適用
+  const tov=loadTensionOverrides();
+  SONGS.forEach(s=>{const k=songKey(s);if(tov[k]!==undefined)s.tension=tov[k];});
   const songs=SONGS.filter(s=>s.year&&s.tension>=1&&s.tension<=10);
   console.log(`全曲: ${SONGS.length}, テンションあり: ${songs.length}`);
 
