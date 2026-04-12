@@ -70,6 +70,16 @@
     .d-val { color: #333; font-weight: 600; }
     .d-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
     .d-tag { padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; background: #f0f0f0; color: #666; }
+    .d-yt { margin-top: 12px; }
+    .d-yt-link {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 6px 12px; border-radius: 8px;
+      background: #ff0000; color: white; font-size: 0.78rem; font-weight: 700;
+      text-decoration: none; transition: opacity 0.2s;
+      line-height: 1;
+    }
+    .d-yt-link:hover { opacity: 0.82; }
+    .d-yt-link svg { width: 13px; height: 13px; fill: white; flex-shrink: 0; }
 
     #filter-panel {
       position: fixed; left: 16px; top: 66px; width: 216px;
@@ -115,7 +125,7 @@
     .lg { display: flex; align-items: center; gap: 4px; }
     .lg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
   </style>
-<!-- deploy:1775129000 --></head>
+<!-- deploy:1775963211 --></head>
 <body>
 
 <div id="toolbar">
@@ -146,6 +156,9 @@
   <div class="d-row"><span class="d-label">テンション</span><span class="d-val" id="d-tens"></span></div>
   <div class="d-row"><span class="d-label">ボーカル</span><span class="d-val" id="d-vocal"></span></div>
   <div class="d-tags" id="d-tags"></div>
+  <div class="d-yt" id="d-yt" style="display:none">
+    <a class="d-yt-link" id="d-yt-link" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19.59 6.69a4.83 4.83 0 0 0-3.77-2.38C13.75 4.09 12 4 12 4s-1.75.09-3.82.31a4.83 4.83 0 0 0-3.77 2.38A11.31 11.31 0 0 0 4 12a11.31 11.31 0 0 0 .41 5.31 4.83 4.83 0 0 0 3.77 2.38C10.25 19.91 12 20 12 20s1.75-.09 3.82-.31a4.83 4.83 0 0 0 3.77-2.38A11.31 11.31 0 0 0 20 12a11.31 11.31 0 0 0-.41-5.31zM10 15V9l5 3-5 3z"/></svg>YouTubeで聴く</a>
+  </div>
 </div>
 
 <div id="filter-panel">
@@ -176,7 +189,7 @@
 const SHEET_ID  = '1hLwdo0GoJmoJOBD-8krJd7hsai8mExWDveZgh1vwc3A';
 const GID       = '0';
 const CSV_URL   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}`;
-const CACHE_KEY = 'oshikara_wb_v5';
+const CACHE_KEY = 'oshikara_wb_v6';
 const TTL_MS    = 30 * 60 * 1000;
 
 const YEAR_W  = 100;
@@ -256,6 +269,7 @@ function toSongs(rows){
   const tCol     =find('テンション','tension');
   const vCol     =find('ボーカル','vocal');
   const tagCols  =ALL_TAGS.map(label=>({label, col:find(label)})).filter(t=>t.col>=0);
+  const urlCol   =find('URL', 'url', 'Youtube', 'YouTube');
 
   console.log('列検出:', {yearCol,titleCol,artistCol,tCol,vCol});
 
@@ -269,6 +283,7 @@ function toSongs(rows){
       tags:    tagCols.filter(t=>r[t.col]?.trim()).map(t=>t.label),
       vocal:   vCol>=0     ? r[vCol]?.trim()||''          : '',
       tension: tCol>=0     ? parseInt(r[tCol])||null      : null,
+      url:     urlCol>=0   ? r[urlCol]?.trim()||''        : '',
     };
   }).filter(Boolean);
 }
@@ -412,6 +427,9 @@ function showDetail(s){
   document.getElementById('d-tens').textContent=s.tension?`${s.tension} / 10`:'未設定';
   document.getElementById('d-vocal').textContent=s.vocal||'—';
   document.getElementById('d-tags').innerHTML=s.tags.map(t=>`<span class="d-tag">${t}</span>`).join('');
+  const ytDiv=document.getElementById('d-yt');
+  if(s.url){document.getElementById('d-yt-link').href=s.url;ytDiv.style.display='';}
+  else{ytDiv.style.display='none';}
   document.getElementById('detail').style.display='block';
 }
 function closeDetail(){document.getElementById('detail').style.display='none';}
